@@ -16,6 +16,14 @@ API = "https://api.bilibili.com"
 UA = "Mozilla/5.0 BilibiliMediaSkill/1.0"
 
 
+class PageSelectionRequired(ValueError):
+    def __init__(self, pages):
+        self.pages = pages
+        choices = "; ".join(f"P{p['page']}: {p['part']} ({p['duration']}s)" for p in pages)
+        super().__init__(f"Multiple pages require selection: {choices}. Ask which page to download, "
+                         "then specify --page, --cid or URL p=.")
+
+
 def request(url, referer="https://www.bilibili.com/"):
     try:
         return urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA, "Referer": referer}), timeout=45)
@@ -44,22 +52,31 @@ def parse_target(target):
     if not match:
         raise ValueError("Supply a BV id or video URL; use search for keywords.")
     query = urllib.parse.parse_qs(parsed.query)
-    return match[0], int(query.get("p", [1])[0])
+    return match[0], int(query["p"][0]) if "p" in query else None
 
 
 def get_info(target, page=None, cid=None):
     bvid, url_page = parse_target(target)
     data = api("/x/web-interface/view", bvid=bvid)
     pages = data.get("pages") or []
-    chosen = next((p for p in pages if p["cid"] == cid), None) if cid else next(
-        (p for p in pages if p["page"] == (page if page is not None else url_page)), None)
-    if not chosen:
+    if not pages:
+        raise ValueError("No accessible pages in video metadata.")
+    selected_page = page if page is not None else url_page
+    if cid is not None:
+        chosen = next((p for p in pages if p["cid"] == cid), None)
+    elif selected_page is not None:
+        chosen = next((p for p in pages if p["page"] == selected_page), None)
+    else:
+        chosen = pages[0] if len(pages) == 1 else None
+    if chosen is None and (cid is not None or selected_page is not None):
         raise ValueError("Requested page/cid does not belong to this video.")
     info = {"bvid": bvid, "title": data.get("title"), "author": data.get("owner", {}).get("name"),
             "description": data.get("desc"), "pages": [
                 {k: p.get(k) for k in ("page", "cid", "part", "duration")} for p in pages],
-            "selected_page": {k: chosen.get(k) for k in ("page", "cid", "part", "duration")}}
-    info["source_url"] = f"https://www.bilibili.com/video/{bvid}/?p={chosen['page']}"
+            "selected_page": {k: chosen.get(k) for k in ("page", "cid", "part", "duration")} if chosen else None}
+    info["source_url"] = f"https://www.bilibili.com/video/{bvid}/"
+    if chosen:
+        info["source_url"] += f"?p={chosen['page']}"
     return info
 
 
@@ -124,6 +141,8 @@ def download_track(track, path, referer):
 
 def download(args):
     info = get_info(args.target, args.page, args.cid)
+    if info["selected_page"] is None:
+        raise PageSelectionRequired(info["pages"])
     dash = get_tracks(info)
     audio = choose_audio(dash["audio"], args.audio_min_kbps, args.audio_max_kbps)
     video = choose_video(dash.get("video", []), args.height) if args.mode == "video" else None
@@ -184,7 +203,8 @@ def main():
         p.add_argument("--page", type=int)
         p.add_argument("--cid", type=int)
         if name == "download":
-            p.add_argument("--mode", choices=["audio", "video"], default="video")
+            p.add_argument("--mode", choices=["audio", "video"], required=True,
+                           help="Required: video includes audio; ask the user if the intended mode is unclear.")
             p.add_argument("--output-dir", required=True)
             p.add_argument("--name")
             p.add_argument("--height", type=int)
@@ -203,11 +223,18 @@ def main():
                "url": f"https://www.bilibili.com/video/{t.get('bvid')}/"} for t in (data.get("result") or [])[:args.limit]])
     elif args.command == "inspect":
         info = get_info(args.target, args.page, args.cid)
+        if info["selected_page"] is None:
+            emit({**info, "status": "needs_selection",
+                  "message": "Ask which page to download, then specify --page, --cid or URL p=."})
+            return
         dash = get_tracks(info)
         emit({**info, "audio": [public_track(t) for t in dash.get("audio", [])],
               "video": [public_track(t) for t in dash.get("video", [])]})
     else:
-        download(args)
+        try:
+            download(args)
+        except PageSelectionRequired as exc:
+            emit({"status": "needs_selection", "pages": exc.pages, "message": str(exc)})
 
 
 if __name__ == "__main__":
