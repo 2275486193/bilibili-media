@@ -15,7 +15,9 @@ description: 搜索 B 站视频，按 BV 号、视频链接或内容描述下载
 
 ## 执行
 
-固定脚本位于本技能 `scripts/`，下列路径相对于本技能目录，从任意工作目录执行均可。使用 Python 3.10+。网络部分只依赖标准库。FFmpeg 通过 `--ffmpeg`、`BILIBILI_FFMPEG`、PATH 或已安装的 `imageio_ffmpeg` 查找；桌面环境可用 `load_workspace_dependencies` 定位 Python，必要时在当前工作区 work/ 安装 imageio-ffmpeg，并将其目录加入 PYTHONPATH；不要写死某次对话的运行时路径。
+本技能不依赖特定 Agent 产品、SDK 或专属工具。由当前 Agent 的技能加载器读取本文件；不支持技能加载器时，可直接读取本文件并通过终端执行脚本。
+
+固定脚本位于本技能 `scripts/`。下列相对路径命令应在技能根目录执行；其他工作目录请使用脚本绝对路径。使用当前环境的 Python 3.10+。网络部分只依赖标准库。FFmpeg 通过 `--ffmpeg`、`BILIBILI_FFMPEG`、PATH 或已安装的 `imageio_ffmpeg` 查找；缺失时按当前环境的依赖管理方式安装 FFmpeg 或 imageio-ffmpeg，不写死设备路径、不依赖专属运行时工具。
 
 ```text
 python scripts/bilibili_media.py search "关键词" --limit 5

@@ -1,6 +1,6 @@
 # bilibili-media
 
-可复用的 Codex 技能：按 BV 号、B 站链接或搜索描述下载视频和音频，默认保留平台原编码，按需使用固定脚本转码。
+面向支持技能文件或命令行工具的 Agent，按 BV 号、B 站链接或关键词下载视频和音频。默认保留平台原编码，仅在明确要求时转码。脚本也可独立运行，不依赖特定 Agent 产品或 SDK。
 
 ## 功能
 
@@ -14,7 +14,7 @@
 
 ## 安装与依赖
 
-将仓库放入 `$CODEX_HOME/skills/bilibili-media`，未设置 CODEX_HOME 时使用 `~/.codex/skills/bilibili-media`。
+将仓库放入所用 Agent 支持的技能目录，由其读取根目录的 `SKILL.md`。各 Agent 的技能目录和调用方式可能不同，请按对应环境配置。没有技能加载机制时，也可让 Agent 读取 `SKILL.md`，并通过终端执行脚本。
 
 需要 Python 3.10+。网络请求仅依赖标准库；合并、解码检查和转码需要 FFmpeg。按以下顺序定位 FFmpeg：`--ffmpeg` 参数、`BILIBILI_FFMPEG` 环境变量、PATH、已安装的 `imageio-ffmpeg`。可选安装方式：
 
@@ -22,12 +22,12 @@
 python -m pip install imageio-ffmpeg
 ```
 
-Codex 识别技能后，可显式使用 `$bilibili-media`，也可通过相关自然语言请求触发。
+自然语言用例：
 
 ```text
-使用 $bilibili-media 下载 BV 号对应视频的第 3P，仅音频，保留原编码。
-使用 $bilibili-media 搜索孤独患者纯伴奏，核对分集后下载。
-使用 $bilibili-media 下载这个视频，保留源文件，另外生成 192kbps MP3。
+下载这个 B 站视频，仅保留音频，使用原编码。
+搜索 Python 入门教程，列出候选视频。
+下载指定视频，保留源文件，另转成 192 kbps MP3。
 ```
 
 ## 命令行使用
@@ -35,7 +35,7 @@ Codex 识别技能后，可显式使用 `$bilibili-media`，也可通过相关�
 下列命令在仓库根目录执行；`BVxxxxxxxxxx` 替换成实际 BV 号。
 
 ```sh
-python scripts/bilibili_media.py search "孤独患者 纯器乐伴奏" --limit 5
+python scripts/bilibili_media.py search "Python 入门教程" --limit 5
 python scripts/bilibili_media.py inspect "https://www.bilibili.com/video/BVxxxxxxxxxx/?p=3"
 python scripts/bilibili_media.py download BVxxxxxxxxxx --page 3 --mode audio --output-dir outputs
 python scripts/bilibili_media.py download BVxxxxxxxxxx --mode video --height 1080 --output-dir outputs
@@ -70,7 +70,6 @@ python scripts/transcode_media.py source.mp4 --format mp4 --crf 20 --output comp
 
 ```text
 SKILL.md                       技能入口与工作流程
-agents/openai.yaml             Codex 展示与调用信息
 scripts/bilibili_media.py       搜索、检查、原编码下载
 scripts/transcode_media.py      固定格式转换
 scripts/media_common.py         哈希、FFmpeg 和解码检查
@@ -81,6 +80,6 @@ references/api.md              API 与音视频流说明
 
 原文件指 B 站提供的编码流，不代表上传者母带或无损素材。样本峰值检查不等于过采样 true-peak 检测，解码正常也不能证明没有可听噪声。
 
-接口可能变化或受风控影响。遇到 412、429、权限限制或验证要求时停止请求；不自动提取浏览器凭据，不绕过登录、付费或 DRM。搜索接口不可用时，Codex 可通过正常网页搜索找到链接后再核对。请在拥有相应权限的范围内使用。
+接口可能变化或受风控影响。遇到 412、429、权限限制或验证要求时停止请求；不自动提取浏览器凭据，不绕过登录、付费或 DRM。搜索接口不可用时，Agent 可通过当前环境正常可用的网页搜索找到链接后再核对。请在拥有相应权限的范围内使用。
 
 已在 Windows / Python 3.12 / FFmpeg 7.1 下验证 BV 分集识别、原流下载、音画无损合并、7 种格式转换、仅封装音频一致性及防覆盖行为。搜索接口曾返回 412，已验证脚本停止请求；这不代表搜索在所有环境中可用。
