@@ -1,0 +1,4 @@
+interface:
+  display_name: "B站音视频下载"
+  short_description: "按 BV 号或搜索结果下载 B 站视频与音轨，默认保留编码，按需转码"
+  default_prompt: "使用 $bilibili-media 搜索或下载 B 站视频，保留原编码，只有我要求时才转换格式。"
